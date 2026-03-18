@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "hello-world",
+    "name": "howareu",
     "slug": "hello-world",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,7 +12,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jazahn.howareyou"
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +24,16 @@
       }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single",
+      "name": "howareu"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "48a679ed-9617-4239-a427-3e2d7767fe01"
+      }
+    },
+    "owner": "jazahn"
   }
 }

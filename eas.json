@@ -1,0 +1,24 @@
+{
+  "cli": {
+    "version": ">= 14.4.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal"
+    },
+    "production": {}
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "family@jazahn.com",
+        "ascAppId": "6760771879",
+        "appleTeamId": "9YU8AB2WTJ"
+      }
+    }
+  }
+}
