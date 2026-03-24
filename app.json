@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "howareu",
-    "slug": "hello-world",
+    "slug": "howareu",
+    "scheme": "howareu",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,7 +14,16 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.jazahn.howareyou"
+      "bundleIdentifier": "com.jazahn.howareyou",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.811550455435-sbaghribhch5aosekrlhbn5pjv1a3480"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -34,6 +44,19 @@
         "projectId": "48a679ed-9617-4239-a427-3e2d7767fe01"
       }
     },
-    "owner": "jazahn"
+    "owner": "jazahn",
+    "plugins": [
+      "expo-web-browser",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "extraPodfileProperties": {
+              "SWIFT_VERSION": "5.0"
+            }
+          }
+        }
+      ]
+    ]
   }
 }
