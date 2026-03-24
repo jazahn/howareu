@@ -121,7 +121,7 @@ async function fetchRecentRows(accessToken) {
 
 // --- Components ---
 
-function HamburgerMenu({ user, onLogout }) {
+function HamburgerMenu({ user, onLogout, onSettings }) {
   const [open, setOpen] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -149,6 +149,13 @@ function HamburgerMenu({ user, onLogout }) {
                 <Text style={styles.menuUserEmail} numberOfLines={1}>{user.email}</Text>
               </View>
             </View>
+            <View style={styles.menuDivider} />
+            <Pressable
+              style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: '#f0f0f0' }]}
+              onPress={() => { setOpen(false); onSettings(); }}
+            >
+              <Text style={styles.menuItemText}>Settings</Text>
+            </Pressable>
             <View style={styles.menuDivider} />
             <Pressable
               style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: '#f0f0f0' }]}
@@ -192,7 +199,7 @@ function HistoryTable({ rows }) {
 
 // --- Main Screen ---
 
-export default function HowAreYouScreen({ user, onLogout }) {
+export default function HowAreYouScreen({ user, onLogout, onSettings }) {
   const [step, setStep] = useState('home'); // 'home' | 'how' | 'feelings' | 'submitting' | 'done'
   const [howAnswer, setHowAnswer] = useState(null);
   const [feelingOptions, setFeelingOptions] = useState(() => pickRandom(ALL_FEELINGS, 5));
@@ -252,7 +259,7 @@ export default function HowAreYouScreen({ user, onLogout }) {
   if (step === 'home') {
     return (
       <View style={styles.screen}>
-        <HamburgerMenu user={user} onLogout={onLogout} />
+        <HamburgerMenu user={user} onLogout={onLogout} onSettings={onSettings} />
         <ScrollView contentContainerStyle={styles.container}>
           <Text style={styles.heading}>howareu</Text>
           <Text style={styles.subtitle}>hey {user.given_name || user.name}</Text>
@@ -279,7 +286,7 @@ export default function HowAreYouScreen({ user, onLogout }) {
   if (step === 'submitting') {
     return (
       <View style={styles.screen}>
-        <HamburgerMenu user={user} onLogout={onLogout} />
+        <HamburgerMenu user={user} onLogout={onLogout} onSettings={onSettings} />
         <View style={styles.container}>
           <ActivityIndicator size="large" color="#4285F4" />
           <Text style={[styles.subtitle, { marginTop: 16 }]}>recording...</Text>
@@ -292,7 +299,7 @@ export default function HowAreYouScreen({ user, onLogout }) {
   if (step === 'done') {
     return (
       <View style={styles.screen}>
-        <HamburgerMenu user={user} onLogout={onLogout} />
+        <HamburgerMenu user={user} onLogout={onLogout} onSettings={onSettings} />
         <ScrollView contentContainerStyle={styles.container}>
           <Text style={styles.heading}>recorded!</Text>
           <Text style={styles.subtitle}>
@@ -320,7 +327,7 @@ export default function HowAreYouScreen({ user, onLogout }) {
   if (step === 'feelings') {
     return (
       <View style={styles.screen}>
-        <HamburgerMenu user={user} onLogout={onLogout} />
+        <HamburgerMenu user={user} onLogout={onLogout} onSettings={onSettings} />
         <View style={styles.container}>
           <Text style={styles.greeting}>
             you said <Text style={{ fontWeight: '700', color: HOW_COLORS[howAnswer] }}>{howAnswer}</Text>
@@ -368,7 +375,7 @@ export default function HowAreYouScreen({ user, onLogout }) {
   // --- how ---
   return (
     <View style={styles.screen}>
-      <HamburgerMenu user={user} onLogout={onLogout} />
+      <HamburgerMenu user={user} onLogout={onLogout} onSettings={onSettings} />
       <View style={styles.container}>
         <Text style={styles.greeting}>hey {user.given_name || user.name}</Text>
         <Text style={styles.heading}>how are you?</Text>
