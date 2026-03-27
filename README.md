@@ -1,4 +1,4 @@
-# howareu
+# HowAreU
 
 A simple iOS app for daily mood check-ins. Log how you're feeling and track your responses over time in a Google Sheet stored in your own Google Drive.
 
@@ -7,8 +7,9 @@ A simple iOS app for daily mood check-ins. Log how you're feeling and track your
 - **Google OAuth login** — sign in with your Google account
 - **Mood check-in** — answer "how are you?" (good / eh / bad) and select feelings from a randomized list
 - **Google Sheets logging** — responses are recorded to a `data` spreadsheet in a `howareu` folder in your Google Drive
-- **Check-in history** — view your last 7 responses in-app
+- **Check-in history** — view your last 7 responses on the home screen
 - **Daily reminders** — optionally set a notification time to remind you to check in
+- **Session expiry handling** — automatically redirects to login if your Google session expires
 
 ## Prerequisites
 
@@ -34,6 +35,8 @@ npx expo run:ios
 # Run on web (limited — OAuth redirect may differ)
 npx expo start --web
 ```
+
+> **Note:** Expo Go does NOT work for this app — Google OAuth requires a native build with the correct bundle ID.
 
 ### Xcode 16.2 Build Fix
 
@@ -61,6 +64,8 @@ If you get Swift 6 / `@MainActor` / Sendable errors during native builds, apply 
 3. **Patch expo-notifications** — in `node_modules/expo-notifications/ios/ExpoNotifications/Notifications/DateComponentsSerializer.swift`, remove or comment out the `isRepeatedDay` block (requires iOS 26 SDK).
 
 4. Re-run `cd ios && pod install`, then `npx expo run:ios --no-install`.
+
+> **EAS cloud builds do NOT have this issue** — they use a compatible Xcode version.
 
 ## Deploying to the App Store
 
@@ -108,7 +113,27 @@ Before submitting, ensure your Google OAuth consent screen is ready for producti
    - Name (from Google login)
    - Usage data (mood responses)
 
-### 4. Build for Production
+### 4. Credentials
+
+The following credentials are configured for builds and submissions:
+
+| Credential | Value |
+|---|---|
+| **EAS Project ID** | `7dea7d4c-a3aa-49c9-9b22-73de9d20eb79` |
+| **EAS Owner** | `jazahn` |
+| **Apple Team ID** | `9YU8AB2WTJ` |
+| **Bundle ID** | `com.jazahn.howareyou` |
+| **ASC App ID** | `6760771879` |
+| **ASC API Key ID** | `273575TC94` |
+| **ASC API Key Issuer ID** | `8853edce-a7d5-4e2c-ae0b-c1f02b63638e` |
+| **ASC API Key Path** | `./keys/AuthKey_273575TC94.p8` |
+| **GCP Project Number** | `811550455435` |
+| **Google Web Client ID** | `811550455435-ho6tdh2bof2nnht9fo9lfl74nlf2rmgs.apps.googleusercontent.com` |
+| **Google iOS Client ID** | `811550455435-sbaghribhch5aosekrlhbn5pjv1a3480.apps.googleusercontent.com` |
+
+The ASC API key (`.p8` file) lives in the `keys/` directory (gitignored). This enables non-interactive `eas submit` without Apple ID prompts.
+
+### 5. Build for Production
 
 ```bash
 eas build --platform ios --profile production
@@ -117,11 +142,10 @@ eas build --platform ios --profile production
 This will:
 - Build the app in the cloud with production settings
 - Handle code signing automatically (EAS manages certificates and provisioning profiles)
+- Auto-increment the build number (`autoIncrement: true` in eas.json)
 - Produce an `.ipa` file ready for submission
 
-You'll be prompted for your Apple ID credentials on the first build.
-
-### 5. Submit to App Store
+### 6. Submit to App Store
 
 ```bash
 eas submit --platform ios --profile production
@@ -133,12 +157,7 @@ Or combine build and submit:
 eas build --platform ios --profile production --auto-submit
 ```
 
-This uploads the build to App Store Connect using the credentials in `eas.json`:
-- Apple ID: `family@jazahn.com`
-- ASC App ID: `6760771879`
-- Team ID: `9YU8AB2WTJ`
-
-### 6. App Store Review
+### 7. App Store Review
 
 After submission:
 
@@ -152,7 +171,7 @@ After submission:
    - **Data usage disclosure** — must match what you declared in App Privacy
    - **Google OAuth verification** — if Google hasn't verified your consent screen, login may fail for non-test users
 
-### 7. TestFlight (Optional, Recommended)
+### 8. TestFlight (Recommended)
 
 Before submitting for full review, test via TestFlight:
 
@@ -165,6 +184,19 @@ Then in App Store Connect:
 1. Go to TestFlight tab
 2. Add internal testers (your team)
 3. Or create a public link for external testers (requires brief Apple review)
+
+### Screenshots
+
+To generate App Store screenshots:
+
+1. Run the app on the appropriate simulator (e.g. iPhone 16 Pro Max, iPad 13")
+2. Take screenshots with Cmd+S in the simulator
+3. Resize to required dimensions if needed:
+   ```bash
+   # iPhone 6.7" display (1290x2796 or 1284x2778)
+   sips -z 2778 1284 screenshot.png
+   ```
+4. Upload to App Store Connect under the appropriate device size
 
 ## Project Structure
 
@@ -180,7 +212,8 @@ howareu/
 │   ├── HowAreYouScreen.js         # Main screen: quiz, history, menu
 │   ├── SettingsScreen.js           # Notification reminder settings
 │   └── ProfileScreen.js           # User profile display (unused)
-└── assets/                         # App icons and splash screen
+├── assets/                         # App icons and splash screen
+└── keys/                           # ASC API key (gitignored)
 ```
 
 ## Environment Notes
@@ -188,3 +221,4 @@ howareu/
 - Google OAuth client IDs are hardcoded in `LoginScreen.js` — move to environment variables for multi-environment setups
 - The `ios/` directory is gitignored and regenerated on each build via `npx expo prebuild`
 - Node_modules patches (for Xcode 16.2 compatibility) need to be reapplied after `npm install` — consider using [patch-package](https://github.com/ds300/patch-package) to automate this
+- Simulator: iPhone 16 Pro (Xcode 16.2, iOS 18.2)
