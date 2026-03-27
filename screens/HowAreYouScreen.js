@@ -48,8 +48,18 @@ function formatDate(isoString) {
 
 // --- Google Drive/Sheets helpers ---
 
+class SessionExpiredError extends Error {
+  constructor() { super('Session expired'); this.name = 'SessionExpiredError'; }
+}
+
+async function authFetch(url, options = {}) {
+  const res = await fetch(url, options);
+  if (res.status === 401) throw new SessionExpiredError();
+  return res;
+}
+
 async function findOrCreateFolder(accessToken) {
-  const searchRes = await fetch(
+  const searchRes = await authFetch(
     `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
       "name='howareu' and mimeType='application/vnd.google-apps.folder' and trashed=false"
     )}&fields=files(id,name)`,
@@ -58,7 +68,7 @@ async function findOrCreateFolder(accessToken) {
   const searchData = await searchRes.json();
   if (searchData.files && searchData.files.length > 0) return searchData.files[0].id;
 
-  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+  const createRes = await authFetch('https://www.googleapis.com/drive/v3/files', {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: 'howareu', mimeType: 'application/vnd.google-apps.folder' }),
@@ -67,7 +77,7 @@ async function findOrCreateFolder(accessToken) {
 }
 
 async function findOrCreateSheet(accessToken, folderId) {
-  const searchRes = await fetch(
+  const searchRes = await authFetch(
     `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
       `name='data' and '${folderId}' in parents and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false`
     )}&fields=files(id,name)`,
@@ -76,7 +86,7 @@ async function findOrCreateSheet(accessToken, folderId) {
   const searchData = await searchRes.json();
   if (searchData.files && searchData.files.length > 0) return searchData.files[0].id;
 
-  const createRes = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+  const createRes = await authFetch('https://sheets.googleapis.com/v4/spreadsheets', {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -95,7 +105,7 @@ async function findOrCreateSheet(accessToken, folderId) {
     }),
   });
   const sheet = await createRes.json();
-  await fetch(
+  await authFetch(
     `https://www.googleapis.com/drive/v3/files/${sheet.spreadsheetId}?addParents=${folderId}&fields=id`,
     { method: 'PATCH', headers: { Authorization: `Bearer ${accessToken}` } }
   );
@@ -104,7 +114,7 @@ async function findOrCreateSheet(accessToken, folderId) {
 
 async function recordResponse(accessToken, spreadsheetId, howAnswer, feelings) {
   const timestamp = new Date().toISOString();
-  await fetch(
+  await authFetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/responses:append?valueInputOption=USER_ENTERED`,
     {
       method: 'POST',
@@ -118,14 +128,15 @@ async function fetchRecentRows(accessToken) {
   try {
     const folderId = await findOrCreateFolder(accessToken);
     const spreadsheetId = await findOrCreateSheet(accessToken, folderId);
-    const res = await fetch(
+    const res = await authFetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/responses?majorDimension=ROWS`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
     const data = await res.json();
     const rows = data.values || [];
     return rows.slice(1).slice(-7);
-  } catch {
+  } catch (e) {
+    if (e instanceof SessionExpiredError) throw e;
     return [];
   }
 }
@@ -221,12 +232,23 @@ export default function HowAreYouScreen({ user, onLogout, onSettings }) {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [greeting] = useState(() => randomGreeting());
 
+  const handleSessionExpired = useCallback(() => {
+    console.log('Session expired, redirecting to login');
+    onLogout();
+  }, [onLogout]);
+
   const loadHistory = useCallback(async () => {
     setLoadingHistory(true);
-    const rows = await fetchRecentRows(user.accessToken);
-    setHistory(rows);
-    setLoadingHistory(false);
-  }, [user.accessToken]);
+    try {
+      const rows = await fetchRecentRows(user.accessToken);
+      setHistory(rows);
+    } catch (e) {
+      if (e instanceof SessionExpiredError) return handleSessionExpired();
+      console.error('Failed to load history:', e);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [user.accessToken, handleSessionExpired]);
 
   useEffect(() => { loadHistory(); }, [loadHistory]);
 
@@ -253,12 +275,17 @@ export default function HowAreYouScreen({ user, onLogout, onSettings }) {
       const spreadsheetId = await findOrCreateSheet(user.accessToken, folderId);
       await recordResponse(user.accessToken, spreadsheetId, howAnswer, selectedFeelings);
     } catch (e) {
+      if (e instanceof SessionExpiredError) return handleSessionExpired();
       console.error('Failed to record response:', e);
     }
     setHowAnswer(null);
     setSelectedFeelings([]);
     setFeelingOptions(pickRandom(ALL_FEELINGS, 5));
-    await loadHistory();
+    try {
+      await loadHistory();
+    } catch (e) {
+      if (e instanceof SessionExpiredError) return handleSessionExpired();
+    }
     setStep('home');
   };
 
