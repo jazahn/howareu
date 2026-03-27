@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, Pressable, ActivityIndicator, ScrollView, Image, Modal } from 'react-native';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const HOW_ANSWERS = ['good', 'eh', 'bad'];
@@ -10,6 +10,11 @@ const HOW_COLORS = {
   bad: '#F44336',
 };
 
+const GREETINGS = [
+  'hey', 'hi', 'good to see you', 'welcome back', 'howdy',
+  'what\'s up', 'hello there', 'glad you\'re here',
+];
+
 const ALL_FEELINGS = [
   'happy', 'sad', 'anxious', 'calm', 'excited',
   'frustrated', 'grateful', 'lonely', 'hopeful', 'overwhelmed',
@@ -18,9 +23,15 @@ const ALL_FEELINGS = [
   'jealous', 'amused', 'guilty', 'relieved', 'curious',
 ];
 
+const HEADER_COLOR = '#5B9BD5';
+
 function pickRandom(arr, count) {
   const shuffled = [...arr].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
+}
+
+function randomGreeting() {
+  return GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
 }
 
 function formatDate(isoString) {
@@ -121,21 +132,23 @@ async function fetchRecentRows(accessToken) {
 
 // --- Components ---
 
-function HamburgerMenu({ user, onLogout, onSettings }) {
-  const [open, setOpen] = useState(false);
+function AppHeader({ user, onLogout, onSettings }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.menuContainer, { top: insets.top + 8 }]}>
-      <Pressable style={styles.hamburger} onPress={() => setOpen(true)}>
+    <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <Text style={styles.headerTitle}>HowAreU</Text>
+
+      <Pressable style={styles.hamburger} onPress={() => setMenuOpen(true)}>
         <View style={styles.hamburgerLine} />
         <View style={styles.hamburgerLine} />
         <View style={styles.hamburgerLine} />
       </Pressable>
 
-      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
-        <Pressable style={styles.menuOverlay} onPress={() => setOpen(false)}>
-          <View style={[styles.menuDropdown, { top: insets.top + 8 }]}>
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setMenuOpen(false)}>
+          <View style={[styles.menuDropdown, { top: insets.top + 12 }]}>
             <View style={styles.menuUserRow}>
               {user.picture ? (
                 <Image source={{ uri: user.picture }} style={styles.menuAvatar} />
@@ -152,14 +165,14 @@ function HamburgerMenu({ user, onLogout, onSettings }) {
             <View style={styles.menuDivider} />
             <Pressable
               style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: '#f0f0f0' }]}
-              onPress={() => { setOpen(false); onSettings(); }}
+              onPress={() => { setMenuOpen(false); onSettings(); }}
             >
               <Text style={styles.menuItemText}>Settings</Text>
             </Pressable>
             <View style={styles.menuDivider} />
             <Pressable
               style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: '#f0f0f0' }]}
-              onPress={() => { setOpen(false); onLogout(); }}
+              onPress={() => { setMenuOpen(false); onLogout(); }}
             >
               <Text style={styles.menuItemText}>Sign out</Text>
             </Pressable>
@@ -200,12 +213,13 @@ function HistoryTable({ rows }) {
 // --- Main Screen ---
 
 export default function HowAreYouScreen({ user, onLogout, onSettings }) {
-  const [step, setStep] = useState('home'); // 'home' | 'how' | 'feelings' | 'submitting' | 'done'
+  const [step, setStep] = useState('home'); // 'home' | 'how' | 'feelings' | 'submitting'
   const [howAnswer, setHowAnswer] = useState(null);
   const [feelingOptions, setFeelingOptions] = useState(() => pickRandom(ALL_FEELINGS, 5));
   const [selectedFeelings, setSelectedFeelings] = useState([]);
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  const [greeting] = useState(() => randomGreeting());
 
   const loadHistory = useCallback(async () => {
     setLoadingHistory(true);
@@ -238,31 +252,23 @@ export default function HowAreYouScreen({ user, onLogout, onSettings }) {
       const folderId = await findOrCreateFolder(user.accessToken);
       const spreadsheetId = await findOrCreateSheet(user.accessToken, folderId);
       await recordResponse(user.accessToken, spreadsheetId, howAnswer, selectedFeelings);
-      const rows = await fetchRecentRows(user.accessToken);
-      setHistory(rows);
-      setStep('done');
     } catch (e) {
       console.error('Failed to record response:', e);
-      setStep('feelings');
     }
-  };
-
-  const handleStartOver = () => {
-    setStep('home');
     setHowAnswer(null);
     setSelectedFeelings([]);
     setFeelingOptions(pickRandom(ALL_FEELINGS, 5));
-    loadHistory();
+    await loadHistory();
+    setStep('home');
   };
 
   // --- home ---
   if (step === 'home') {
     return (
       <View style={styles.screen}>
-        <HamburgerMenu user={user} onLogout={onLogout} onSettings={onSettings} />
-        <ScrollView contentContainerStyle={styles.container}>
-          <Text style={styles.heading}>howareu</Text>
-          <Text style={styles.subtitle}>hey {user.given_name || user.name}</Text>
+        <AppHeader user={user} onLogout={onLogout} onSettings={onSettings} />
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <Text style={styles.greetingHome}>{greeting}, {user.given_name || user.name}</Text>
 
           <Pressable
             style={({ pressed }) => [styles.startButton, pressed && styles.buttonPressed]}
@@ -271,12 +277,14 @@ export default function HowAreYouScreen({ user, onLogout, onSettings }) {
             <Text style={styles.startButtonText}>How are you?</Text>
           </Pressable>
 
-          <Text style={styles.historyHeading}>recent check-ins</Text>
-          {loadingHistory ? (
-            <ActivityIndicator size="small" color="#4285F4" style={{ marginTop: 16 }} />
-          ) : (
-            <HistoryTable rows={history} />
-          )}
+          <View style={styles.historySection}>
+            <Text style={styles.historyHeading}>recent check-ins</Text>
+            {loadingHistory ? (
+              <ActivityIndicator size="small" color="#4285F4" style={{ marginTop: 16 }} />
+            ) : (
+              <HistoryTable rows={history} />
+            )}
+          </View>
         </ScrollView>
       </View>
     );
@@ -286,39 +294,11 @@ export default function HowAreYouScreen({ user, onLogout, onSettings }) {
   if (step === 'submitting') {
     return (
       <View style={styles.screen}>
-        <HamburgerMenu user={user} onLogout={onLogout} onSettings={onSettings} />
-        <View style={styles.container}>
+        <AppHeader user={user} onLogout={onLogout} onSettings={onSettings} />
+        <View style={styles.centeredContent}>
           <ActivityIndicator size="large" color="#4285F4" />
           <Text style={[styles.subtitle, { marginTop: 16 }]}>recording...</Text>
         </View>
-      </View>
-    );
-  }
-
-  // --- done ---
-  if (step === 'done') {
-    return (
-      <View style={styles.screen}>
-        <HamburgerMenu user={user} onLogout={onLogout} onSettings={onSettings} />
-        <ScrollView contentContainerStyle={styles.container}>
-          <Text style={styles.heading}>recorded!</Text>
-          <Text style={styles.subtitle}>
-            you said: <Text style={{ fontWeight: '700', color: HOW_COLORS[howAnswer] }}>{howAnswer}</Text>
-            {selectedFeelings.length > 0 && (
-              <Text>, feeling {selectedFeelings.join(', ')}</Text>
-            )}
-          </Text>
-
-          <Text style={styles.historyHeading}>recent check-ins</Text>
-          <HistoryTable rows={history} />
-
-          <Pressable
-            style={({ pressed }) => [styles.startButton, pressed && styles.buttonPressed]}
-            onPress={handleStartOver}
-          >
-            <Text style={styles.startButtonText}>How are you?</Text>
-          </Pressable>
-        </ScrollView>
       </View>
     );
   }
@@ -327,12 +307,12 @@ export default function HowAreYouScreen({ user, onLogout, onSettings }) {
   if (step === 'feelings') {
     return (
       <View style={styles.screen}>
-        <HamburgerMenu user={user} onLogout={onLogout} onSettings={onSettings} />
-        <View style={styles.container}>
+        <AppHeader user={user} onLogout={onLogout} onSettings={onSettings} />
+        <View style={styles.centeredContent}>
           <Text style={styles.greeting}>
             you said <Text style={{ fontWeight: '700', color: HOW_COLORS[howAnswer] }}>{howAnswer}</Text>
           </Text>
-          <Text style={styles.heading}>what are you feeling?</Text>
+          <Text style={styles.questionHeading}>what are you feeling?</Text>
 
           <View style={styles.feelingsWrap}>
             {feelingOptions.map((feeling) => {
@@ -375,10 +355,10 @@ export default function HowAreYouScreen({ user, onLogout, onSettings }) {
   // --- how ---
   return (
     <View style={styles.screen}>
-      <HamburgerMenu user={user} onLogout={onLogout} onSettings={onSettings} />
-      <View style={styles.container}>
-        <Text style={styles.greeting}>hey {user.given_name || user.name}</Text>
-        <Text style={styles.heading}>how are you?</Text>
+      <AppHeader user={user} onLogout={onLogout} onSettings={onSettings} />
+      <View style={styles.centeredContent}>
+        <Text style={styles.greeting}>{greeting}, {user.given_name || user.name}</Text>
+        <Text style={styles.questionHeading}>how are you?</Text>
 
         <View style={styles.answers}>
           {HOW_ANSWERS.map((answer) => (
@@ -405,17 +385,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  container: {
-    flexGrow: 1,
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-    paddingTop: 72,
+    justifyContent: 'space-between',
+    backgroundColor: HEADER_COLOR,
+    paddingBottom: 14,
+    paddingHorizontal: 20,
   },
-  menuContainer: {
-    position: 'absolute',
-    right: 16,
-    zIndex: 100,
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#fff',
   },
   hamburger: {
     padding: 10,
@@ -424,8 +405,19 @@ const styles = StyleSheet.create({
   hamburgerLine: {
     width: 24,
     height: 2.5,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#fff',
     borderRadius: 2,
+  },
+  scrollContent: {
+    alignItems: 'center',
+    padding: 24,
+    paddingTop: 24,
+  },
+  centeredContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
   },
   menuOverlay: {
     flex: 1,
@@ -489,12 +481,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#333',
   },
+  greetingHome: {
+    fontSize: 20,
+    color: '#666',
+    marginBottom: 24,
+  },
   greeting: {
     fontSize: 18,
     color: '#666',
     marginBottom: 8,
   },
-  heading: {
+  questionHeading: {
     fontSize: 36,
     fontWeight: '700',
     color: '#1a1a1a',
@@ -505,13 +502,17 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 24,
   },
+  historySection: {
+    width: '100%',
+    maxWidth: 420,
+    alignItems: 'stretch',
+  },
   historyHeading: {
     fontSize: 20,
     fontWeight: '600',
     color: '#1a1a1a',
     marginBottom: 12,
     marginTop: 8,
-    alignSelf: 'flex-start',
   },
   startButton: {
     backgroundColor: '#4285F4',
@@ -598,7 +599,6 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     width: '100%',
-    maxWidth: 420,
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 24,
@@ -609,10 +609,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#999',
   },
-  // Table styles
   table: {
     width: '100%',
-    maxWidth: 420,
     backgroundColor: '#fff',
     borderRadius: 12,
     overflow: 'hidden',

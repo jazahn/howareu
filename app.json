@@ -21,8 +21,14 @@
             "CFBundleURLSchemes": [
               "com.googleusercontent.apps.811550455435-sbaghribhch5aosekrlhbn5pjv1a3480"
             ]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.811550455435-sbaghribhch5aosekrlhbn5pjv1a3480"
+            ]
           }
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
